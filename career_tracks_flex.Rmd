@@ -1,0 +1,79 @@
+---
+title: "UC Career Tracks Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+runtime: shiny
+---
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(ggplot2)
+library(scales)
+library(DT)
+
+```
+
+```{r global, include = FALSE}
+career_tracks <- readRDS("career_tracks.RDS")
+```
+
+Sidebar {.sidebar}
+=======================================================================
+
+### Family and Functions
+
+More information can be found at the [UC Career Tracks website.](http://ucnet.universityofcalifornia.edu/working-at-uc/your-career/career-tracks/index.html)
+
+```{r}
+selectInput("jfamily", "Job Family:", unique(career_tracks$job_family))
+uiOutput('ui_function')
+
+output$ui_function <- renderUI({
+       jfunctions <- career_tracks %>% 
+         filter(job_family == input$jfamily) %>% 
+         .$job_function %>% 
+         unique()
+      selectInput('jfunction', 'Job Function', jfunctions)
+})
+  
+```
+
+Career Tracks Table
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Job Families and Functions
+
+
+```{r}
+dataTableOutput("job_table")
+output$job_table <- renderDataTable({
+  career_tracks %>% 
+  select(Family = job_family, Function = job_function, Title = official_title, Grade = grade, Min = minimum, Mid = midpoint, Max = maximum) %>% 
+  filter(Family == input$jfamily,
+         Function == input$jfunction)
+})
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Job Function Description 
+
+```{r}
+htmlOutput("function_description")
+output$function_description <- renderUI({
+    career_tracks %>% 
+  filter(job_family == input$jfamily,
+         job_function == input$jfunction) %>% 
+    .$job_summary %>% 
+    unique()
+})
+```
+
+
+
+
