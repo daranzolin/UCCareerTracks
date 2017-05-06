@@ -1,3 +1,5 @@
+library(tidyverse)
+
 download.file("http://shr.ucsc.edu/policy/special-projects/career-tracks/Resources/Career%20Tracks%20Job%20Function%20Summary.xlsx",
               destfile = "job_families_functions_descriptions.xlsx")
 download.file("http://shr.ucsc.edu/policy/special-projects/career-tracks/Resources/Career%20Tracks%20Job%20Title%20Listing%202-15-17.pdf",
@@ -44,6 +46,3 @@ career_tracks <- career_tracks_df %>%
 
 
 saveRDS(career_tracks, file = "career_tracks.RDS")
-ggplot(career_tracks, aes(as.numeric(maximum))) +
-  geom_histogram() +
-  scale_x_continuous(labels = dollar)
