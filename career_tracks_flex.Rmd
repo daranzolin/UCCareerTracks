@@ -11,11 +11,28 @@ library(tidyverse)
 library(ggplot2)
 library(scales)
 library(DT)
+library(hrbrthemes)
 
 ```
 
 ```{r global, include = FALSE}
 career_tracks <- readRDS("career_tracks.RDS")
+
+normal_prob_area_plot <- function(lb, ub, mean = 0, sd = 1, limits = c(mean - 3 * sd, mean + 3 * sd)) {
+  x <- seq(limits[1], limits[2], length.out = 100)
+  xmin <- max(lb, limits[1])
+  xmax <- min(ub, limits[2])
+  areax <- seq(xmin, xmax, length.out = 100)
+  area <- data.frame(x = areax, ymin = 0, ymax = dnorm(areax, mean = mean, sd = sd))
+  (ggplot()
+    + geom_line(data.frame(x = x, y = dnorm(x, mean = mean, sd = sd)),
+                mapping = aes(x = x, y = y))
+    + geom_ribbon(data = area, mapping = aes(x = x, ymin = ymin, ymax = ymax))
+    + scale_x_continuous(limits = limits))
+}
+
+perc_rank <- function(x) trunc(rank(x))/length(x)
+
 ```
 
 Sidebar {.sidebar}
@@ -26,18 +43,32 @@ Sidebar {.sidebar}
 More information can be found at the [UC Career Tracks website.](http://ucnet.universityofcalifornia.edu/working-at-uc/your-career/career-tracks/index.html)
 
 ```{r}
-selectInput("jfamily", "Job Family:", unique(career_tracks$job_family))
+selectInput("jfamily", "Select your Job Family:", unique(career_tracks$job_family))
 uiOutput('ui_function')
+uiOutput('ui_title')
+numericInput("emp_salary", "Enter your annual salary:", 0, 0, 300000)
+actionButton("button", "Submit")
 
 output$ui_function <- renderUI({
        jfunctions <- career_tracks %>% 
          filter(job_family == input$jfamily) %>% 
          .$job_function %>% 
          unique()
-      selectInput('jfunction', 'Job Function', jfunctions)
+      selectInput('jfunction', 'Select your Job Function:', jfunctions)
+})
+
+output$ui_title <- renderUI({
+  jtitles <- career_tracks %>% 
+    filter(job_family == input$jfamily,
+           job_function == input$jfunction) %>% 
+    .$official_title %>% 
+    unique()
+  selectInput('jtitle', "Select your Job Title:", jtitles)
 })
   
 ```
+
+Note: the shaded area represents one standard deviation from the hypothetical mean.
 
 Career Tracks Table
 =======================================================================
@@ -74,6 +105,49 @@ output$function_description <- renderUI({
 })
 ```
 
+### Normal Distribution of Salaries (Hypothetical)
+
+```{r}
+
+jotitle <- eventReactive(input$button, {
+    input$jtitle
+  })
+
+pdata <- eventReactive(input$button, {
+    career_tracks %>% 
+      filter(job_family == input$jfamily,
+         job_function == input$jfunction,
+         official_title == input$jtitle)
+})
+  
+empsal <- eventReactive(input$button, {
+    input$emp_salary
+})
+
+emp_perc <- eventReactive(input$button, {
+  round(pnorm(empsal(), mean = pdata()$midpoint, sd = pdata()$midpoint/10) * 100)
+})
+  
+output$plot <- renderPlot({
+    normal_prob_area_plot(pdata()$midpoint - pdata()$midpoint/10, 
+                          pdata()$midpoint + pdata()$midpoint/10, 
+                          mean = pdata()$midpoint, 
+                          sd = pdata()$midpoint/10) +
+    geom_vline(xintercept = pdata()$midpoint, color = "green", linetype = "dashed") +
+    geom_vline(xintercept = empsal(), color = "red", linetype = "dashed") +
+    scale_x_continuous(labels = scales::dollar) +
+    labs(x = "Annual Salary", 
+    title = jotitle(), 
+    subtitle = paste("Your salary (red line) is at the ", emp_perc(), "th percentile.", sep = ""),
+    caption = "Source: UCSC Career Tracks Station") +
+    theme_ipsum() +
+    theme(axis.title.y=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks.y=element_blank())
+})
+
+plotOutput("plot")
+```
 
 
 
