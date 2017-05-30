@@ -35,18 +35,16 @@ perc_rank <- function(x) trunc(rank(x))/length(x)
 
 ```
 
-Sidebar {.sidebar}
+Sidebar {.sidebar data-width=300}
 =======================================================================
 
 ### Family and Functions
-
-More information can be found at the [UC Career Tracks website.](http://ucnet.universityofcalifornia.edu/working-at-uc/your-career/career-tracks/index.html)
 
 ```{r}
 selectInput("jfamily", "Select your Job Family:", unique(career_tracks$job_family))
 uiOutput('ui_function')
 uiOutput('ui_title')
-numericInput("emp_salary", "Enter your annual salary:", 0, 0, 300000)
+numericInput("emp_salary", "Enter your annual salary:", 68500, 0, 300000)
 actionButton("button", "Submit")
 
 output$ui_function <- renderUI({
@@ -68,9 +66,16 @@ output$ui_title <- renderUI({
   
 ```
 
-Note: the shaded area represents one standard deviation from the hypothetical mean.
+Use the **Career Tracks Summaries** tab to locate your UC Career Tracks family, function, and title. Then, enter
+your annual salary and click "Submit" to calculate your compensation percentile. 
 
-Career Tracks Table
+Use the **Other Information** tab to browse miscellaneous charts pertaining to UC Career Trackks.
+
+***
+
+More information can be found at the [UC Career Tracks website.](http://ucnet.universityofcalifornia.edu/working-at-uc/your-career/career-tracks/index.html)
+
+Career Tracks Summaries
 =======================================================================
 
 Row
@@ -78,21 +83,25 @@ Row
 
 ### Job Families and Functions
 
-
 ```{r}
 dataTableOutput("job_table")
-output$job_table <- renderDataTable({
+output$job_table <- renderDataTable(
   career_tracks %>% 
   select(Family = job_family, Function = job_function, Title = official_title, Grade = grade, Min = minimum, Mid = midpoint, Max = maximum) %>% 
   filter(Family == input$jfamily,
-         Function == input$jfunction)
-})
+         Function == input$jfunction),
+  options = list(
+  columnDefs = list(list(className = 'dt-center', targets = 5)),
+  pageLength = 5,
+  lengthMenu = c(5, 10, 15, 20)
+  )
+)
 ```
 
 Row
 -----------------------------------------------------------------------
 
-### Job Function Description 
+### Job Function Descriptions
 
 ```{r}
 htmlOutput("function_description")
@@ -104,6 +113,7 @@ output$function_description <- renderUI({
     unique()
 })
 ```
+
 
 ### Normal Distribution of Salaries (Hypothetical)
 
@@ -124,30 +134,102 @@ empsal <- eventReactive(input$button, {
     input$emp_salary
 })
 
-emp_perc <- eventReactive(input$button, {
-  round(pnorm(empsal(), mean = pdata()$midpoint, sd = pdata()$midpoint/10) * 100)
+sal_sd <- eventReactive(input$button, {
+  pdata()$midpoint/10
 })
+
+emp_perc <- eventReactive(input$button, {
+  round(pnorm(empsal(), mean = pdata()$midpoint, sd = sal_sd()) * 100)
+})
+
   
-output$plot <- renderPlot({
-    normal_prob_area_plot(pdata()$midpoint - pdata()$midpoint/10, 
-                          pdata()$midpoint + pdata()$midpoint/10, 
+output$plot1 <- renderPlot({
+    normal_prob_area_plot(pdata()$midpoint - sal_sd(), 
+                          pdata()$midpoint + sal_sd(), 
                           mean = pdata()$midpoint, 
-                          sd = pdata()$midpoint/10) +
+                          sd = sal_sd()) +
     geom_vline(xintercept = pdata()$midpoint, color = "green", linetype = "dashed") +
     geom_vline(xintercept = empsal(), color = "red", linetype = "dashed") +
     scale_x_continuous(labels = scales::dollar) +
     labs(x = "Annual Salary", 
     title = jotitle(), 
-    subtitle = paste("Your salary (red line) is at the ", emp_perc(), "th percentile.", sep = ""),
-    caption = "Source: UCSC Career Tracks Station") +
+    subtitle = paste("Your salary (red line) is at the ", emp_perc(), "th percentile.", sep = "")) +
     theme_ipsum() +
     theme(axis.title.y=element_blank(),
     axis.text.y=element_blank(),
-    axis.ticks.y=element_blank())
+    axis.ticks.y=element_blank()
+    )
 })
 
-plotOutput("plot")
+plotOutput("plot1")
 ```
 
+Other Information
+=======================================================================
+
+Row {.tabset}
+-----------------------------------------------------------------------
+
+### Levels
+
+```{r}
+output$plot2 <- renderPlot({
+  career_tracks %>% 
+  count(level) %>% 
+  ggplot(aes(reorder(level, n), n)) +
+  geom_bar(stat = "identity", fill = "darkblue", color = "black") +
+  geom_text(stat = "identity", aes(label = n), color = "red", nudge_y = 5) +
+  labs(x = "Level",
+       y = "Count", 
+       title = "UC Career Tracks Levels", 
+       subtitle = "Counts of Existing Levels",
+       caption = "Source: UCSC Career Tracks Station") +
+  coord_flip() +
+  theme_ipsum()
+})
+plotOutput("plot2")
+```
+
+
+### Grades
+
+```{r}
+output$plot3 <- renderPlot({
+  career_tracks %>% 
+  filter(grade != "") %>% 
+  count(grade) %>% 
+  ggplot(aes(reorder(grade, n), n)) +
+  geom_bar(stat = "identity", fill = "yellow", color = "black") +
+  geom_text(stat = "identity", aes(label = n), nudge_y = 3, color = "red") +
+  labs(x = "Grade",
+       y = "Count", 
+       title = "UC Career Tracks Grades", 
+       subtitle = "Counts of Existing Grades",
+       caption = "Source: UCSC Career Tracks Station") +
+  coord_flip() +
+  theme_ipsum()
+})
+plotOutput("plot3")
+```
+
+### Personnel Program
+
+```{r}
+output$plot4 <- renderPlot({
+  career_tracks %>% 
+  filter(per_prog != "") %>% 
+  count(per_prog) %>% 
+  ggplot(aes(reorder(per_prog, n), n)) +
+  geom_bar(stat = "identity", fill = "lightgreen", color = "black") +
+  geom_text(stat = "identity", aes(label = n), color = "red", nudge_y = 35, size = 6) +
+  labs(x = "Personnel Program",
+       y = "Count", 
+       title = "UC Career Tracks Personnel Programs", 
+       subtitle = "Counts of Personnel Programs",
+       caption = "Source: UCSC Career Tracks Station") +
+  theme_ipsum()
+})
+plotOutput("plot4")
+```
 
 
